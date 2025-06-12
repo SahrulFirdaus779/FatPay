@@ -15,7 +15,7 @@ PAGES = {
 
 st.set_page_config(
     page_title="FatPay - Landing Page", # Diubah judul halaman
-    page_icon="📌", # Diubah icon halaman
+    page_icon="fmlagi.png", # Diubah icon halaman
     layout="centered"
 )
 
@@ -68,8 +68,22 @@ if st.session_state.current_page == "Beranda":
         """
     )
     # [Image of FatPay Illustration]
-    st.image("https://placehold.co/600x300/F0F2F6/1E1E1E?text=FatPay+Illustration", caption="Ilustrasi Aplikasi FatPay")
+import base64
 
+def get_base64_image(image_path):
+    with open(image_path, "rb") as img_file:
+        return base64.b64encode(img_file.read()).decode()
+    
+if st.session_state.current_page == "Beranda":
+    encoded_image = get_base64_image("workflow.png")
+    st.markdown(
+        f"""
+        <div style="text-align: center; margin-bottom: 20px;">
+            <img src="data:image/png;base64,{encoded_image}" alt="FatPay Logo" style="width: 300px;">
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
     # Footer
     st.markdown("---")
     st.caption("© 2025 FatPay | Dibuat dengan ❤️ oleh Tim IT Fathan Mubina")
