@@ -1,2 +1,2 @@
-NIS,Nama,Bulan/Ujian,Jumlah,No Orang Tua,Tanggal
-1314,Zakarta,UTS Ganjil,500000,89527509633,2025-06-12 09:15
+Nomor Pembayaran,Tanggal,Kode Unik Siswa,Nama Siswa,Nomor WhatsApp Orang Tua,Jenis Pembayaran,Bulan/Ujian,Jumlah,Diskon,Grandtotal
+TRX-4DFE9C1C,2025-06-14,12345,Budi Santoso,,UTS,Ganjil,500000,0,500000

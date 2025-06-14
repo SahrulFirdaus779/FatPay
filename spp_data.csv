@@ -1,3 +1,2 @@
-NIS,Nama,Bulan/Ujian,Jumlah,No Orang Tua,Tanggal
-1314,Sahrul Firdaus,"Januari, Februari, Maret",100000,89527509633,2025-06-12 09:19
-230124221004,Firdaus Sahrul,"April, Juli",5000000,89527509633,2025-06-12 12:03
+Nomor Pembayaran,Tanggal,Kode Unik Siswa,Nama Siswa,Nomor WhatsApp Orang Tua,Jenis Pembayaran,Bulan/Ujian,Jumlah,Grandtotal,Diskon
+TRX-1E01FF6A,2025-06-14,12345,Budi Santoso,,SPP,Mei,400000,400000,0

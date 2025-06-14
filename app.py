@@ -1,98 +1,86 @@
 import streamlit as st
-import os
-# from PIL import Image # Opsional: jika Anda ingin mengimpor logo dari file lokal
+import pandas as pd
+from datetime import datetime
 
-# Konfigurasi halaman
-# Meskipun ini adalah landing page, kita tetap mendefinisikan halaman lain
-# agar sidebar navigasi Streamlit berfungsi dengan benar untuk multi-halaman.
-PAGES = {
-    "Beranda": "app.py", # Beranda (landing page ini)
-    "Dashboard": "pages/dashboard.py",
-    "SPP Pay": "pages/spp_pay.py",
-    "UTS Pay": "pages/uts_pay.py",
-    "UAS Pay": "pages/uas_pay.py"
-}
-
+# --- Konfigurasi Halaman ---
 st.set_page_config(
-    page_title="FatPay - Landing Page", # Diubah judul halaman
-    page_icon="fmlagi.png", # Diubah icon halaman
-    layout="centered"
+    page_title="FatPay - Sistem Pembayaran Sekolah Digital",
+    page_icon="💸",
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
+# --- CSS Kustom untuk Menyembunyikan Menu Otomatis Streamlit ---
+st.markdown("""
+    <style>
+        #MainMenu {visibility: hidden;}
+        footer {visibility: hidden;}
+        div[data-testid="stSidebarNav"] {
+            display: none;
+        }
+    </style>
+    """, unsafe_allow_html=True)
 
-# Mengatur state halaman saat ini untuk navigasi Streamlit
+# --- Logo dan Judul Sidebar ---
+# st.sidebar.image("fmlagi.png", use_container_width=True)
+st.sidebar.title("Navigasi FatPay")
+
+# --- Inisialisasi Session State untuk Halaman ---
 if 'current_page' not in st.session_state:
-    st.session_state.current_page = "Beranda" # Set default page to Beranda
+    st.session_state.current_page = "Beranda"
+
+# --- Fungsi untuk Mengubah Halaman ---
+def set_page(page_name):
+    st.session_state.current_page = page_name
+
+# --- Sidebar Navigasi ---
+st.sidebar.button("Beranda", on_click=set_page, args=("Beranda",), use_container_width=True)
+st.sidebar.button("Dashboard", on_click=set_page, args=("Dashboard",), use_container_width=True)
+st.sidebar.markdown("---")
+st.sidebar.button("Pembayaran Baru", on_click=set_page, args=("Pembayaran Baru",), type="primary", use_container_width=True)
+# --- TAMBAH TOMBOL KWITANSI DI SINI (Opsional, jika ingin bisa diakses dari sidebar) ---
+# st.sidebar.button("Lihat Kwitansi Terakhir", on_click=set_page, args=("Kwitansi",), use_container_width=True)
+st.sidebar.markdown("---")
+st.sidebar.subheader("Riwayat Pembayaran")
+st.sidebar.button("Riwayat SPP", on_click=set_page, args=("Riwayat SPP",), use_container_width=True)
+st.sidebar.button("Riwayat UTS", on_click=set_page, args=("Riwayat UTS",), use_container_width=True)
+st.sidebar.button("Riwayat UAS", on_click=set_page, args=("Riwayat UAS",), use_container_width=True)
 
 
-# Konten Halaman yang Dipilih
-import base64
-
-def get_base64_image(image_path):
-    with open(image_path, "rb") as img_file:
-        return base64.b64encode(img_file.read()).decode()
-    
+# --- Pemrosesan Halaman Berdasarkan Session State ---
 if st.session_state.current_page == "Beranda":
-    encoded_image = get_base64_image("fmlagi.png")
-    st.markdown(
-        f"""
-        <div style="text-align: center; margin-bottom: 20px;">
-            <img src="data:image/png;base64,{encoded_image}" alt="FatPay Logo" style="width: 150px;">
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-    # Konten tambahan di bawah menu navigasi sidebar
-    st.sidebar.info(
-        "Aplikasi ini dikembangkan untuk Yayasan Fathan Mubina. "
-        "Terima kasih atas kepercayaan Anda! ✨"
-    )
+    st.title("Selamat Datang di FatPay 💸")
+    st.markdown("""
+    FatPay adalah aplikasi berbasis Streamlit yang dirancang untuk memudahkan proses administrasi pembayaran sekolah (SPP, UTS, UAS) di Yayasan Fathan Mubina.
+    Aplikasi ini membantu sekolah dalam mencatat pembayaran siswa, mengirim notifikasi otomatis, dan mengelola riwayat pembayaran secara efisien.
 
-    st.title("👋 Selamat Datang di FatPay") # Judul utama
-
-    # Divider
-    st.markdown("---")
-
-    # Konten sambutan
-    st.markdown(
-        """
-        Assalamu'alaikum Warahmatullahi Wabarakatuh 🙏
-        Selamat datang di **FatPay**, sistem pembayaran SPP digital untuk memudahkan proses pembayaran di Yayasan Fathan Mubina.
-
-        Di aplikasi ini, Anda dapat:
-        - Mencatat pembayaran SPP, UTS, dan UAS siswa secara efisien
-        - Mengirim notifikasi otomatis ke WhatsApp orang tua
-        - Melihat dan mengelola riwayat pembayaran
-
-        Silakan navigasi ke menu di sebelah kiri untuk mulai menggunakan fitur aplikasi.
-        """
-    )
-    # [Image of FatPay Illustration]
-import base64
-
-def get_base64_image(image_path):
-    with open(image_path, "rb") as img_file:
-        return base64.b64encode(img_file.read()).decode()
-    
-if st.session_state.current_page == "Beranda":
-    encoded_image = get_base64_image("workflow.png")
-    st.markdown(
-        f"""
-        <div style="text-align: center; margin-bottom: 20px;">
-            <img src="data:image/png;base64,{encoded_image}" alt="FatPay Logo" style="width: 300px;">
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-    # Footer
-    st.markdown("---")
-    st.caption("© 2025 FatPay | Dibuat dengan ❤️ oleh Tim IT Fathan Mubina")
+    ### ✨ Fitur Utama:
+    - **Pencatatan Pembayaran Instan:** Catat pembayaran SPP, UTS, dan UAS siswa dengan cepat dan akurat melalui formulir yang intuitif, kini dengan fitur kode unik siswa dan input pembayaran dinamis.
+    - **Riwayat Pembayaran Lengkap dan Terstruktur:** Akses, kelola, dan pantau seluruh histori pembayaran siswa dalam satu tempat, dengan data yang terpisah untuk setiap jenis pembayaran.
+    - **Dashboard Analitik Sederhana:** Dapatkan gambaran umum dan ringkasan data pembayaran sekolah secara keseluruhan untuk pemantauan keuangan yang lebih baik.
+    - **Fungsi Edit & Hapus Data:** Perbarui atau hapus data pembayaran yang sudah tercatat dengan mudah.
+    """)
+    # st.image("fmlagi.png", width=300)
 
 elif st.session_state.current_page == "Dashboard":
-    # Streamlit akan secara otomatis menemukan dan menjalankan pages/dashboard.py
-    # jika session_state.current_page adalah "Dashboard"
-    pass 
-else:
-    # Untuk halaman pembayaran lainnya (SPP Pay, UTS Pay, UAS Pay)
-    # Streamlit akan secara otomatis menemukan dan menjalankan file di folder `pages`
-    pass
+    from pages import dashboard
+    dashboard.show_dashboard()
+
+elif st.session_state.current_page == "Pembayaran Baru":
+    from pages import payment_form
+    payment_form.show_payment_form()
+
+# --- TAMBAH LOGIKA UNTUK HALAMAN KWITANSI BARU ---
+elif st.session_state.current_page == "Kwitansi":
+    from pages import receipt_display
+    receipt_display.show_receipt_page()
+
+elif st.session_state.current_page == "Riwayat SPP":
+    from pages import spp_pay
+    spp_pay.show_spp_history()
+elif st.session_state.current_page == "Riwayat UTS":
+    from pages import uts_pay
+    uts_pay.show_uts_history()
+elif st.session_state.current_page == "Riwayat UAS":
+    from pages import uas_pay
+    uas_pay.show_uas_history()

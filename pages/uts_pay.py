@@ -1,157 +1,152 @@
 import streamlit as st
 import pandas as pd
-import datetime
+from datetime import datetime
 import os
-import subprocess
-import urllib.parse
 
-# File CSV khusus untuk pembayaran UTS
-FILE_PATH = "uts_data.csv"
-PAYMENT_TYPE = "UTS" # Definisikan jenis pembayaran di sini
+# Asumsi lokasi file ini adalah di folder 'pages'
+UTS_DATA_PATH = 'uts_data.csv'
 
-# Fungsi untuk membaca data dari CSV
-def load_data():
-    columns = ["NIS", "Nama", "Bulan/Ujian", "Jumlah", "No Orang Tua", "Tanggal"]
-    if os.path.exists(FILE_PATH):
-        try:
-            df = pd.read_csv(FILE_PATH)
-            for col in columns:
-                if col not in df.columns:
-                    df[col] = None
-            return df[columns]
-        except pd.errors.EmptyDataError:
-            return pd.DataFrame(columns=columns)
-    return pd.DataFrame(columns=columns)
-
-# Fungsi untuk menyimpan data baru ke CSV
-def save_data(nis, nama, bulan_atau_ujian_list, jumlah, no_hp):
-    df = load_data()
-    bulan_atau_ujian_str = ", ".join(bulan_atau_ujian_list)
-    tanggal_pembayaran = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
-    
-    new_data = pd.DataFrame([[nis, nama, bulan_atau_ujian_str, jumlah, no_hp, tanggal_pembayaran]],
-                            columns=["NIS", "Nama", "Bulan/Ujian", "Jumlah", "No Orang Tua", "Tanggal"])
-    
-    df = pd.concat([df, new_data], ignore_index=True)
-    df.to_csv(FILE_PATH, index=False)
-    return tanggal_pembayaran
-
-# Fungsi untuk mengirim pesan WhatsApp
-def send_whatsapp_message(no_hp, nama, bulan_atau_ujian_list, jumlah, tanggal):
-    pesan = (
-        f'Kepada Yth. Orangtua Ananda *{nama}* Ditempat.\n\n'
-        f"Kami menginformasikan bahwa pada *{tanggal}* ananda *{nama}* telah melakukan pembayaran {PAYMENT_TYPE} untuk ujian *{', '.join(bulan_atau_ujian_list)}* dengan nominal sebesar *Rp{jumlah:,.0f}*.\n\n"
-        f"Atas perhatiannya kami mengucapkan Terima kasih! 🙏"
-    )
-    pesan_encoded = urllib.parse.quote_plus(pesan)
-    wa_link = f"https://wa.me/62{no_hp}?text={pesan_encoded}"
-
+@st.cache_data
+def load_data(file_path):
+    """
+    Memuat data dari CSV, mengembalikan DataFrame kosong jika file tidak ditemukan.
+    Mengisi NaN di kolom numerik dengan 0 dan mengkonversinya ke int.
+    Memastikan kolom Tanggal diformat dengan benar dan mengganti NaT dengan string kosong.
+    """
+    # Kolom default harus sesuai dengan apa yang disimpan oleh payment_form.py
+    default_columns_for_empty_df = [
+        'Nomor Pembayaran', 'Tanggal', 'Kode Unik Siswa', 'Nama Siswa',
+        'Jenis Pembayaran', 'Bulan/Ujian', 'Jumlah', 'Diskon', 'Grandtotal'
+    ]
     try:
-        if os.name == "nt":  # Windows
-            subprocess.Popen(f'start "" "{wa_link}"', shell=True)
-        elif os.name == "posix":  # Linux/MacOS
-            subprocess.run(["xdg-open", wa_link])
-        st.success("✅ Pesan WhatsApp berhasil dikirim ke WhatsApp Desktop!")
+        if not os.path.exists(file_path):
+            return pd.DataFrame(columns=default_columns_for_empty_df)
+
+        df = pd.read_csv(file_path)
+
+        if 'Tanggal' in df.columns:
+            df['Tanggal'] = pd.to_datetime(df['Tanggal'], errors='coerce')
+            df['Tanggal'] = df['Tanggal'].dt.strftime('%Y-%m-%d').fillna('')
+            
+        numeric_cols = ['Jumlah', 'Diskon', 'Grandtotal']
+        for col in numeric_cols:
+            if col in df.columns:
+                df[col] = df[col].fillna(0).astype(int)
+
+        return df
+    except FileNotFoundError:
+        return pd.DataFrame(columns=default_columns_for_empty_df)
     except Exception as e:
-        st.error(f"❌ Gagal mengirim WhatsApp: {e}")
+        st.error(f"Error saat memuat data dari {file_path}: {e}")
+        return pd.DataFrame(columns=default_columns_for_empty_df)
 
-st.title(f"👨‍💻 Pembayaran {PAYMENT_TYPE}")
+def save_data(df, file_path):
+    """Menyimpan DataFrame ke CSV."""
+    try:
+        df.to_csv(file_path, index=False)
+        st.cache_data.clear()
+    except Exception as e:
+        st.error(f"Error saat menyimpan data ke {file_path}: {e}")
 
-# Input Form Pembayaran
-nis = st.text_input("📌 NIS Siswa", key=f"{PAYMENT_TYPE.lower()}_nis")
-nama = st.text_input("📌 Nama Siswa", key=f"{PAYMENT_TYPE.lower()}_nama")
-ujian_uts = st.multiselect("📌 Pilih Ujian UTS", ["UTS Ganjil", "UTS Genap"], key=f"{PAYMENT_TYPE.lower()}_ujian")
-jumlah = st.number_input("📌 Jumlah Pembayaran (Rp)", min_value=0, step=10000, key=f"{PAYMENT_TYPE.lower()}_jumlah")
-no_hp = st.text_input("📌 Nomor WhatsApp Orang Tua (Tanpa +62)", value="89527509633", key=f"{PAYMENT_TYPE.lower()}_no_hp")
+def show_uts_history():
+    st.title("Riwayat Pembayaran UTS")
 
-if st.button(f"💾 Simpan & Kirim Notifikasi {PAYMENT_TYPE}", key=f"{PAYMENT_TYPE.lower()}_submit"):
-    if nis and nama and ujian_uts and jumlah > 0 and no_hp:
-        tanggal_pembayaran = save_data(nis, nama, ujian_uts, jumlah, no_hp)
-        send_whatsapp_message(no_hp, nama, ujian_uts, jumlah, tanggal_pembayaran)
-        st.success(f"✅ Pembayaran {PAYMENT_TYPE} {nama} untuk ujian {', '.join(ujian_uts)} berhasil dicatat & notifikasi terkirim.")
-        st.rerun()
-    else:
-        st.warning(f"⚠️ Harap isi semua data untuk pembayaran {PAYMENT_TYPE}!")
+    df_uts = load_data(UTS_DATA_PATH)
 
-# Tampilkan data pembayaran UTS
-st.subheader(f"📊 Riwayat Pembayaran {PAYMENT_TYPE}")
-df = load_data() 
+    if df_uts.empty:
+        st.info("Belum ada data pembayaran UTS tercatat.")
+        return
 
-if not df.empty:
-    df.index = range(len(df))
-    st.dataframe(df)
-
-    # Inisialisasi session state untuk data yang diedit
-    if 'selected_edit_row_data_uts' not in st.session_state:
-        st.session_state.selected_edit_row_data_uts = None
-    if 'selected_index_uts' not in st.session_state: # New: Store original index
-        st.session_state.selected_index_uts = -1
-
-    row_labels = [f"{row['Nama']} - {row['Bulan/Ujian']} - Rp{row['Jumlah']} ({row['Tanggal']})" for idx, row in df.iterrows()]
-    selected_label = st.selectbox(f"📌 Pilih Data {PAYMENT_TYPE} untuk Diedit / Dihapus", options=row_labels, key=f"{PAYMENT_TYPE.lower()}_select_edit_delete")
-
-    # This button triggers the display of the edit form
-    if st.button(f"📝 Edit Data {PAYMENT_TYPE}", key=f"{PAYMENT_TYPE.lower()}_edit_button"):
-        if selected_label:
-            # Find the index in the currently displayed DataFrame (df)
-            selected_index_df_display = df[df.apply(lambda row: f"{row['Nama']} - {row['Bulan/Ujian']} - Rp{row['Jumlah']} ({row['Tanggal']})" == selected_label, axis=1)].index[0]
-            st.session_state.selected_edit_row_data_uts = df.loc[selected_index_df_display].to_dict()
-            st.session_state.selected_index_uts = selected_index_df_display # Store the actual index
-            st.rerun() # Rerun to display the form with pre-filled data
-        else:
-            st.warning("⚠️ Harap pilih data yang akan diedit terlebih dahulu!")
-
-    # Tampilkan formulir edit jika data baris yang dipilih ada di session_state
-    if st.session_state.selected_edit_row_data_uts:
-        row_to_edit = st.session_state.selected_edit_row_data_uts
-        original_index_for_edit = st.session_state.selected_index_uts
-
-        with st.form(f"edit_form_{PAYMENT_TYPE.lower()}"): # Key for the form
-            st.markdown(f"**Edit Data {row_to_edit.get('Nama', '')}**")
-            edit_nis = st.text_input("📌 Edit NIS", row_to_edit["NIS"], key=f"edit_nis_{PAYMENT_TYPE.lower()}")
-            edit_nama = st.text_input("📌 Edit Nama", row_to_edit["Nama"], key=f"edit_nama_{PAYMENT_TYPE.lower()}")
-            edit_ujian_uts = st.text_input("📌 Edit Ujian (pisahkan dengan koma jika lebih dari satu)", row_to_edit["Bulan/Ujian"], key=f"edit_ujian_{PAYMENT_TYPE.lower()}")
-            edit_jumlah = st.number_input("📌 Edit Jumlah Pembayaran (Rp)", value=row_to_edit["Jumlah"], step=10000, key=f"edit_jumlah_{PAYMENT_TYPE.lower()}")
-            edit_no_hp = st.text_input("📌 Edit Nomor WA", row_to_edit["No Orang Tua"], key=f"edit_no_hp_{PAYMENT_TYPE.lower()}")
-            submitted = st.form_submit_button(f"💾 Simpan Perubahan {PAYMENT_TYPE}") 
-            
-            if submitted:
-                current_df_for_update = load_data() # Reload data to get the absolute latest state
-                
-                # Check if the original index still exists in the current DataFrame
-                if original_index_for_edit in current_df_for_update.index:
-                    current_df_for_update.loc[original_index_for_edit, ["NIS", "Nama", "Bulan/Ujian", "Jumlah", "No Orang Tua"]] = \
-                        edit_nis, edit_nama, edit_ujian_uts, edit_jumlah, edit_no_hp
-                    
-                    current_df_for_update.to_csv(FILE_PATH, index=False)
-                    st.success(f"✅ Data {PAYMENT_TYPE} berhasil diperbarui!")
-                    st.session_state.selected_edit_row_data_uts = None # Clear selected data after successful edit
-                    st.session_state.selected_index_uts = -1 # Clear original index
-                    st.rerun()
-                else:
-                    st.error("❌ Data yang akan diedit tidak ditemukan di data terbaru. Mungkin sudah dihapus atau diubah secara eksternal.")
-        st.markdown("---") # Garis pemisah setelah form edit
+    st.subheader("Tabel Riwayat UTS")
     
-    # Hapus Data Button (independent of edit form submission)
-    if st.button(f"🗑️ Hapus Data {PAYMENT_TYPE}", key=f"{PAYMENT_TYPE.lower()}_delete_button"):
-        if selected_label: # Ensure a row is selected
-            current_df_for_delete = load_data() # Reload data for deletion to ensure latest state
-            
-            # Find the index of the selected item in the current DataFrame (important for consistency)
-            selected_index_current_df = df[df.apply(lambda row: f"{row['Nama']} - {row['Bulan/Ujian']} - Rp{row['Jumlah']} ({row['Tanggal']})" == selected_label, axis=1)].index[0]
-            
-            # Check if the index to delete still exists
-            if selected_index_current_df in current_df_for_delete.index:
-                current_df_for_delete.drop(selected_index_current_df, inplace=True)
-                current_df_for_delete.to_csv(FILE_PATH, index=False)
-                st.warning(f"🗑️ Data {PAYMENT_TYPE} berhasil dihapus!")
-                st.session_state.selected_edit_row_data_uts = None # Clear selected data after successful deletion
-                st.session_state.selected_index_uts = -1
-                st.rerun()
-            else:
-                st.error("❌ Data tidak ditemukan untuk dihapus. Mungkin sudah dihapus oleh pengguna lain.")
-        else:
-            st.warning("⚠️ Harap pilih data yang akan dihapus terlebih dahulu!")
+    display_cols = ['Nomor Pembayaran', 'Tanggal', 'Nama Siswa', 'Bulan/Ujian', 'Jumlah', 'Diskon', 'Grandtotal']
+    actual_display_cols = [col for col in display_cols if col in df_uts.columns]
+    
+    if 'Tanggal' in actual_display_cols:
+        df_uts_display = df_uts[actual_display_cols].copy()
+        df_uts_display['Tanggal_Sort'] = pd.to_datetime(df_uts_display['Tanggal'], errors='coerce')
+        st.dataframe(df_uts_display.sort_values(by='Tanggal_Sort', ascending=False).drop(columns=['Tanggal_Sort']), use_container_width=True)
+    else:
+        st.dataframe(df_uts[actual_display_cols], use_container_width=True)
 
-else:
-    st.warning(f"📢 Belum ada data pembayaran {PAYMENT_TYPE} yang tercatat!")
+
+    st.subheader("Edit atau Hapus Data UTS")
+    
+    if not df_uts.empty and \
+       'Nomor Pembayaran' in df_uts.columns and \
+       'Nama Siswa' in df_uts.columns and \
+       'Bulan/Ujian' in df_uts.columns and \
+       'Grandtotal' in df_uts.columns:
+        
+        if df_uts['Grandtotal'].dtype != 'int64':
+             df_uts['Grandtotal'] = df_uts['Grandtotal'].fillna(0).astype(int)
+
+        options = df_uts.apply(lambda row: f"{row['Nomor Pembayaran']} - {row['Nama Siswa']} ({row['Bulan/Ujian']}) - Rp {row['Grandtotal']:,.0f}", axis=1).tolist()
+    else:
+        options = ["Tidak ada data yang dapat dipilih"]
+
+    selected_option = st.selectbox("Pilih data untuk diedit atau dihapus", options, key="uts_select_edit_delete")
+    
+    try:
+        selected_index = options.index(selected_option) if selected_option != "Tidak ada data yang dapat dipilih" else None
+    except ValueError:
+        selected_index = None
+
+    if selected_index is not None and not df_uts.empty:
+        data_to_modify = df_uts.iloc[selected_index].copy()
+
+        st.write(f"Anda memilih: **{selected_option}**")
+
+        with st.expander("📝 Edit Data UTS"):
+            st.write("Ubah data di bawah ini:")
+            
+            current_date_str = str(data_to_modify.get('Tanggal', ''))
+            
+            current_date_val = None
+            if current_date_str and current_date_str != '':
+                try:
+                    current_date_val = datetime.strptime(current_date_str, '%Y-%m-%d').date()
+                except ValueError:
+                    current_date_val = datetime.now().date()
+            else:
+                current_date_val = datetime.now().date()
+
+            edited_payment_id = st.text_input("Nomor Pembayaran", value=str(data_to_modify.get('Nomor Pembayaran', '')), disabled=True)
+            edited_tanggal = st.date_input("Tanggal", value=current_date_val, key=f"uts_edit_tanggal_{selected_index}")
+            edited_kode_unik = st.text_input("Kode Unik Siswa", value=str(data_to_modify.get('Kode Unik Siswa', '')), key=f"uts_edit_kode_unik_{selected_index}")
+            edited_nama_siswa = st.text_input("Nama Siswa", value=str(data_to_modify.get('Nama Siswa', '')), key=f"uts_edit_nama_siswa_{selected_index}")
+            edited_jenis_pembayaran = st.selectbox("Jenis Pembayaran", ['SPP', 'UTS', 'UAS'], index=['SPP', 'UTS', 'UAS'].index(data_to_modify.get('Jenis Pembayaran', 'UTS')), key=f"uts_edit_jenis_pembayaran_{selected_index}")
+            edited_bulan_ujian = st.text_input("Bulan/Ujian", value=str(data_to_modify.get('Bulan/Ujian', '')), key=f"uts_edit_bulan_ujian_{selected_index}")
+            
+            edited_jumlah = st.number_input("Jumlah", value=int(data_to_modify.get('Jumlah', 0)), min_value=0, key=f"uts_edit_jumlah_{selected_index}")
+            edited_diskon = st.number_input("Diskon", value=int(data_to_modify.get('Diskon', 0)), min_value=0, key=f"uts_edit_diskon_{selected_index}")
+
+            edited_grandtotal = edited_jumlah - edited_diskon
+            st.text_input("Grandtotal", value=f"{edited_grandtotal:,.0f}", disabled=True, key=f"uts_edit_grandtotal_display_{selected_index}")
+
+            if st.button("💾 Simpan Perubahan UTS", key=f"save_uts_edit_{selected_index}"):
+                df_uts.loc[selected_index, 'Tanggal'] = edited_tanggal.strftime('%Y-%m-%d')
+                df_uts.loc[selected_index, 'Kode Unik Siswa'] = edited_kode_unik
+                df_uts.loc[selected_index, 'Nama Siswa'] = edited_nama_siswa
+                df_uts.loc[selected_index, 'Jenis Pembayaran'] = edited_jenis_pembayaran
+                df_uts.loc[selected_index, 'Bulan/Ujian'] = edited_bulan_ujian
+                df_uts.loc[selected_index, 'Jumlah'] = edited_jumlah
+                df_uts.loc[selected_index, 'Diskon'] = edited_diskon
+                df_uts.loc[selected_index, 'Grandtotal'] = edited_grandtotal
+
+                save_data(df_uts, UTS_DATA_PATH)
+                st.success("Data UTS berhasil diperbarui!")
+                st.rerun()
+
+        if st.button("🗑️ Hapus Data UTS", key=f"delete_uts_btn_{selected_index}"):
+            df_uts = df_uts.drop(df_uts.index[selected_index]).reset_index(drop=True)
+            save_data(df_uts, UTS_DATA_PATH)
+            st.success("Data UTS berhasil dihapus!")
+            st.rerun()
+    elif df_uts.empty:
+        st.info("Tidak ada data untuk diedit atau dihapus.")
+    else:
+        st.info("Silakan pilih data dari daftar di atas untuk mengedit atau menghapus.")
+
+if __name__ == '__main__':
+    show_uts_history()
